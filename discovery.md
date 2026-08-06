@@ -148,13 +148,25 @@ Ref `oznvdznekexdgblmxwqr`, named `seaking` (renamed from `plunder` 2026-08-03).
 
 ### 8.4 Domains (GoDaddy DNS, verified by resolution)
 
-`seakingcapital.com` A→208.109.29.159 (GoDaddy site) · `www` CNAME apex · `app` → skckraken.netlify.app · `portal` → skcportal.netlify.app · `manager`/`kraken` → no records. MANIFEST's future subdomain: **[ASK]** (`manifest.` proposed).
+`seakingcapital.com` A→208.109.29.159 (GoDaddy site) · `www` CNAME apex · `app` → skckraken.netlify.app · `portal` → skcportal.netlify.app · `manager`/`kraken` → no records. MANIFEST's future subdomain: **[ASK]** (`manifest.` proposed). *Superseded by the one-origin pivot (§10a #9): no per-tool subdomain is needed; tools mount under paths on `app.`.*
+
+### 8.5 Mount constraints for the one-origin shell (found 2026-08-06)
+
+The pivot to one origin makes several previously-irrelevant app details load-bearing. Found by reading the repos directly:
+
+| Constraint | Evidence | Why it matters under one origin |
+|---|---|---|
+| **`@supabase/ssr` version split** — Kraken `^0.5.2` (manager, client-portal, `packages/auth`), MANIFEST `^0.7.0` | the four `package.json` files | Every app on `app.seakingcapital.com` talks to the same project ref, so they all read and write **the same cookie name**. That shared cookie is exactly what makes sign-in-once work — and it means two versions with different cookie chunking/encoding behavior would be fighting over one jar. Pin one version suite-wide, or centralize the client in a shared package. **Must be tested, not assumed.** |
+| **Neither app sets `basePath`** | `manifest/next.config.ts`, `apps/manager/next.config.ts` | Every mounted tool needs `basePath` + `assetPrefix` before it can live under a path. Kraken's manager is today *at* `app.seakingcapital.com`; mounting it at `/kraken` is a URL change for a live app with real users. |
+| **MANIFEST is a root-scoped PWA** — `manifest.webmanifest` has `start_url: "/"`, `scope: "/"`; `/sw.js` registered from `src/lib/offline-queue.ts:130`; `next.config.ts` sends `Service-Worker-Allowed: /` | those three files | A service worker scoped to `/` claims **the whole origin** — MANIFEST's would intercept `/kraken/*`. At a path mount, all of it re-scopes to `/manifest/`: SW path, SW scope header, `start_url`, `scope`, both shortcut URLs (`/?capture=1`, `/watchlist`), icon paths. All config, no architecture — but Derek re-installs the phone PWA after the move. |
+| **MANIFEST sends `X-Frame-Options: DENY`** | `manifest/next.config.ts` | The shell must route by path, not embed tools in iframes. (Correct anyway; this forecloses the wrong design.) |
+| Next versions differ — Kraken `^15.5.20`, MANIFEST `^15.5.4` | same `package.json` files | Not blocking: multi-zone tolerates version skew between zones. Noted so nobody assumes lockstep. |
 
 ---
 
 ## 9. Corrections this discovery forces on suite-design.md
 
-To be applied in the design-doc revision **after** Derek reviews this file — recorded here first so the doc and the facts never silently diverge:
+**Status: APPLIED 2026-08-06** in the design doc's one-origin revision. This section stays as the record of what the draft got wrong and what corrected it. Recorded here first so the doc and the facts never silently diverge:
 
 1. **§8 Hosting table is wrong**: manager lives at `app.` (not `manager.`), both Kraken apps are **Netlify** (not unknown/Vercel). Cutover = Netlify env swap; allowlist must add the two Netlify hostnames on `seaking`.
 2. **New hard gate before K2**: Plunder membership + real policies (§3.1). The current design doc treats Plunder authorization as "arrives with its first UI" — discovery shows it must arrive **before Kraken's users do**.
@@ -181,6 +193,15 @@ To be applied in the design-doc revision **after** Derek reviews this file — r
 
 **⛔ Standing constraint, effective immediately: production Kraken is frozen.** No changes to the Netlify sites or to the `ucfy` Supabase project until Derek lifts this. Two already-approved fixes are therefore **deferred, not done**: closing signup on `ucfy` (#2) and custom SMTP on `ucfy` (#3 — Resend, `no-reply@seakingcapital.com`). Both execute at freeze-lift or as an early port step. (I was mid-flight on both when the freeze landed; nothing was touched.)
 
+> **Scope clarified 2026-08-06 (Derek).** The freeze is **suite-side**. It binds suite sessions — this workstream makes no changes to the Netlify sites or `ucfy`, and does not execute the two queued fixes — and it does **not** restrict Kraken's own product development, which continues on its normal cadence. The clarification was prompted by evidence that the literal wording and the practice had diverged: seven commits landed in the Kraken working copy on 2026-08-06 (`6a1fe51`…`c076837`), including `c4a547f` *"retrigger Netlify deploy after Pro upgrade"* — a production deploy — and migration `20260806120001_auto_parity_txn_ref_tiebreak.sql`. Kraken's own `CLAUDE.md` carries no mention of the freeze, and that repo's established norm runs migrations autonomously. So: two workstreams, one production system, one of them (this one) hands-off. The two approved `ucfy` fixes stay queued and are **not** suite work to execute unilaterally.
+
+**Decision, 2026-08-06 (Derek): build order.** In his words: build the consolidated suite **in parallel** while he continues to debug Kraken on the side; when the suite is fully set up **excluding Kraken**, an extended session brings Kraken in and cuts over; that is **the last task**, because Kraken stays in daily production use throughout the build and *"we cannot have that tool exist in two places — there needs to be a clean cutover."*
+
+Consequences recorded with it:
+1. The K-runbook (suite-design §9) executes as **one compressed extended session at the end**, phases consecutive, gates intact — not spread over weeks. Inside that session, data copied early gets a **final delta sync inside a brief prod write-freeze at cutover**, so the no-dual-existence constraint holds operationally, not just organizationally.
+2. **The suite builds at an interim origin.** `app.seakingcapital.com` *is* the manager today; the shell cannot occupy that root until the extended session claims it. The S-track (shell, MANIFEST mount, toggles) lives on an interim host until cutover; the `app.` flip is part of the session. Interim host naming: small [OPEN], folds into the D15 decision.
+3. The suite-side freeze on `ucfy`/Netlify effectively stands until that session — the session's green light and the freeze-lift are the same moment. Read-only discovery on `ucfy` (cron bodies, env enumeration with Derek) remains allowed anytime and shortens the session.
+
 The §10 answers:
 
 1. **Plunder gate: yes** — and generalized: account setup becomes per-system yes/no toggles ("Kraken access? Plunder access? …"), admin-driven; unpermissioned tools don't even appear in the main dash. Toggles = membership rows; the "main dash" implies a **suite shell/launcher** (see #9).
@@ -205,4 +226,14 @@ The §10 answers:
 
 - **2026-08-03, later** — Decision round recorded (§10a): **production-Kraken freeze in force** — the two approved `ucfy` fixes were halted mid-flight, nothing touched, both deferred. Executed outside the freeze: Deepwatch pushed to `SKCAccount/DEEPWATCH` (auto-init README merged), Kraken working-copy docs commits pushed, experiments marked graveyard. Same evening: the three open items resolved (wait / portal separate / suite repo go); docs relocated to `SKCAccount/SEAKING-SUITE`; root `CLAUDE.md` and `START.md` created for sessions opening at the `Claude Projects` root; MANIFEST's session commits pushed to `SKCAccount/MANIFEST`.
 
-**Still to examine (next discovery sessions):** Kraken `CLAUDE.md` "Decisions already locked" + `ARCHITECTURE.md` full read into a Kraken context appendix · Plunder GitHub Actions workflow file (exact schedule, secret names) · Harpoon `WORKFLOWS.md`/`apis.md` + confirm Deepwatch webhook integration · Deepwatch docs pass · `ucfy` cron job `command` bodies + `invoke_edge_job` definition + secrets names · Netlify env enumeration [needs #8 above] · the two experiment repos' disposition.
+- **2026-08-06** — Session opened on the suite; three days since the last entry. Two things happened.
+
+  **(1) The freeze's scope was clarified** (§10a, boxed note). Evidence of divergence between the wording and the practice: seven Kraken commits on 2026-08-06 including a production Netlify deploy (`c4a547f`) and a new migration (`20260806120001`). Derek's ruling: the freeze is suite-side — it binds this workstream, not Kraken's product development. The two queued `ucfy` fixes stay queued; suite work does not execute them. Nothing was touched on `ucfy` or Netlify this session.
+
+  **(2) Mount-constraint discovery for the one-origin shell** → new §8.5. Read the four `package.json` files, both `next.config.ts` files, `manifest.webmanifest`, and MANIFEST's SW registration. Findings: a `@supabase/ssr` version split across the estate (Kraken `^0.5.2` / MANIFEST `^0.7.0`) that lands on a **shared cookie jar** under one origin; no `basePath` set anywhere; MANIFEST is a root-scoped PWA whose service worker would claim the whole origin. None of these are blockers — all are config — but all were invisible until the pivot made paths load-bearing, and none were in the design doc.
+
+  **Then: `suite-design.md` fully revised for the one-origin model** — banner closed, §10a folded in, and the seven corrections in §9 below applied to the design doc. §9 stays as the record of what the draft got wrong and why; it is now *applied*, not *pending*.
+
+  **(3) Mid-session, Derek added the build-order decision** (§10a above): suite built in parallel excluding Kraken; Kraken port is the last task, one extended session, clean cutover, no dual existence. Folded into the design doc (D13 decided in shape; §9 preamble; §11 restructured into the S-track and the K-finale; interim-origin consequence stated).
+
+**Still to examine (next discovery sessions):** Kraken `CLAUDE.md` "Decisions already locked" + `ARCHITECTURE.md` full read into a Kraken context appendix · Plunder GitHub Actions workflow file (exact schedule, secret names) · Harpoon `WORKFLOWS.md`/`apis.md` + confirm Deepwatch webhook integration · Deepwatch docs pass · `ucfy` cron job `command` bodies + `invoke_edge_job` definition + secrets names · Netlify env enumeration [needs #8 above] · the two experiment repos' disposition · **the cookie-jar test** (§8.5: do `@supabase/ssr` 0.5.2 and 0.7.0 interoperate on one cookie? — decides whether the version pin is a prerequisite or a cleanup).

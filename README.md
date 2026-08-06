@@ -7,15 +7,18 @@ belong to none of them.
 | File | What it is |
 |---|---|
 | [discovery.md](discovery.md) | **The master process file.** Facts about every system in the estate, each with its evidence; decisions as they were made (§10, §10a); a dated log (§11). Nothing in the suite gets built from assumption — it gets built from this file. |
-| [suite-design.md](suite-design.md) | The identity / authorization / consolidation design. Carries a revision-pending banner: Derek's one-origin pivot supersedes parts of the draft, and the rewrite lands after the remaining open items settle. |
+| [suite-design.md](suite-design.md) | The identity / authorization / consolidation design, revised 2026-08-06 for the one-origin model. §11 holds the two-track build order (suite first at an interim origin; Kraken last as one extended cutover session); §13 the open decisions. |
 | [START.md](START.md) | The prompt for launching a fresh Claude Code session on suite work, from the `Claude Projects` root. |
 
 ## Standing constraints (the short list every session must know)
 
-1. **⛔ Production Kraken is frozen** — no changes to the Netlify sites
-   (`app.` / `portal.seakingcapital.com`) or the `ucfy…` Supabase project until
-   Derek lifts the freeze. Two approved fixes (close signup, custom SMTP) are
-   deferred behind it.
+1. **⛔ Production Kraken is frozen — suite-side** (scope clarified 2026-08-06):
+   suite sessions make no changes to the Netlify sites (`app.` /
+   `portal.seakingcapital.com`) or the `ucfy…` Supabase project; two approved
+   fixes (close signup, custom SMTP) stay queued behind it. Derek's own Kraken
+   product development continues unaffected. The freeze lifts at the final
+   Kraken port session (D13: Kraken comes last, one extended session, clean
+   cutover).
 2. **Never `supabase db push` against the `seaking` project.** Each system
    applies its own migrations and records them in its own
    `{schema}.schema_migrations` ledger.
