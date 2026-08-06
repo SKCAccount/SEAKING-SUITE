@@ -36,7 +36,7 @@ Open items are collected in §13.
 | D12 | No `supabase db push` against the combined project — per-system migration ledgers | **[LIVE]** for MANIFEST; Kraken adopts at port |
 | D13 | **Kraken comes last.** The suite is fully set up excluding Kraken; then one extended session ports and cuts over — Kraken never exists in two places | **[DECIDED]** 2026-08-06 in shape; runbook detail **[PROPOSED]** §9 |
 | D14 | Kraken's manager scoping model under the suite | **[OPEN]** — two options in §5.5; needed at the K-session, not before |
-| D15 | How tools are mounted under the origin (edge routing vs. app rewrites) | **[OPEN]** — three options in §4.5, recommendation given |
+| D15 | Tools mount via **edge routing** on **Netlify**; shell serves `/` only, outside every tool's request path; S-track at an interim Netlify origin | **[DECIDED]** 2026-08-06 — §4.5 option (b) as recommended |
 
 ---
 
@@ -85,8 +85,19 @@ Supabase project `ucfyfnwkxzryywuomool`.
   real client can request password resets.
 - **RLS helpers live unqualified in `public`** — they move into `kraken` with
   pinned `search_path` at port.
-- **17 migrations hard-qualify `public.`** — a port cannot replay under a
+- **17+ migrations hard-qualify `public.`** — a port cannot replay under a
   different `search_path`; it needs a scripted qualification rewrite (§9 K1).
+- **Deep-read additions (2026-08-06, discovery.md §2.5)**: Kraken actually spans
+  **two schemas** — `public` plus a non-PostgREST-exposed `internal` schema
+  holding the 10 projection objects behind scoped wrapper views (the tenant
+  boundary for projections). **Supabase Vault** holds the cron secret and the
+  Plaid access tokens (plaintext column dropped) — a dump does not carry Vault.
+  A fixed-UUID **System service account** is how pg_cron calls guarded RPCs.
+  Edge functions **are deployed** (seven, live-verified in Kraken's own docs);
+  crons deliver via `invoke_edge_job` → pg_net with a Vault-held header secret.
+  The **Plaid webhook** is registered on the live bank item against
+  `app.seakingcapital.com/api/plaid-webhook`. Dev and prod share `ucfy`. All of
+  these are runbook line-items below.
 
 **Freeze posture (discovery.md §10a, clarified 2026-08-06):** the freeze is
 suite-side. This workstream changes nothing on Netlify or `ucfy`, and does not
@@ -295,10 +306,13 @@ calls them under the admin's own session.
   of people — that a script is not a burden. Revisit if the cadence ever
   justifies it.
 
-### 4.5 How tools mount [OPEN — D15]
+### 4.5 How tools mount [DECIDED 2026-08-06 — D15: option (b)]
 
-Derek's proposed shape was multi-zone. Having looked at what actually has to be
-served, this document recommends differently, and the reasoning is availability.
+Derek's originally proposed shape was multi-zone. Having looked at what actually
+has to be served, this document recommended differently — availability being the
+reason — and **Derek approved (b) on 2026-08-06**, with the platform
+consolidation onto Netlify and the interim-origin arrangement travelling with
+it. The options as analyzed:
 
 | Option | Shape | Assessment |
 |---|---|---|
@@ -306,21 +320,18 @@ served, this document recommends differently, and the reasoning is availability.
 | **(b) Platform-level path routing** ✅ | Routing rules on the `app.seakingcapital.com` site proxy `/kraken/*`, `/manifest/*`, … to each deployment at the CDN edge; the shell app merely serves `/` | Same URLs, same cookie jar, same user experience — but the shell is **out of the critical path**. If the shell is broken, `/kraken` is unaffected. Framework-agnostic, so Harpoon can join later without a rewrite. |
 | **(c) One monolith** | Absorb every tool into a single application | Rejected. Merges deploy cadence and blast radius, and each system's independence is the point. |
 
-**Recommendation: (b).** Kraken is a system of record with a real external
-client on it; putting a new, young application in front of every one of its
-requests trades a real availability property for nothing. Edge routing gets the
-same one-origin result and keeps failures independent.
+**Decided: (b).** Kraken is a system of record with a real external client on
+it; putting a new, young application in front of every one of its requests
+trades a real availability property for nothing. Edge routing gets the same
+one-origin result and keeps failures independent.
 
-This differs from the shape proposed in §10a #9, so it is a decision for Derek,
-not an assumption to build on.
-
-**A consequence that needs deciding with it:** Kraken is on Netlify; MANIFEST
-was destined for Vercel. Routing across two vendors works, but it puts a second
-host in the request path of every MANIFEST page. **Recommendation: consolidate
-the shell and mounted tools onto one platform — Netlify**, where Kraken already
-lives. The cost is concrete and small: MANIFEST's two Vercel crons (`vercel.json`
-— gmail `17 * * * *`, gcal `42 */4 * * *`) become Netlify scheduled functions.
-That work has not started and should not until D15 is settled.
+**Decided with it:** the shell and mounted tools consolidate onto **one
+platform — Netlify**, where Kraken already lives. (Routing across two vendors
+works, but it puts a second host in the request path of every MANIFEST page.)
+The cost is concrete and small: MANIFEST's two Vercel crons (`vercel.json` —
+gmail `17 * * * *`, gcal `42 */4 * * *`) become Netlify scheduled functions,
+done at S2. The S-track's interim origin is a Netlify subdomain, named at S1;
+a `suite.seakingcapital.com` CNAME at GoDaddy is optional polish.
 
 ---
 
@@ -525,6 +536,12 @@ ALL. The nightly worker is unaffected — it connects directly, not as
 `authenticated`. The local dashboard needs Derek's membership row, which is the
 bootstrap insert of §4.4.
 
+**How it ships** (discovery.md §3, found 2026-08-06): Plunder's deploy runner
+*is* its nightly GitHub Actions workflow — `worker migrate` runs at 06:30 UTC
+every night. The gate migration lands by merging to Plunder's main; it applies
+on the next nightly, or same-day via `workflow_dispatch`. No direct-connection
+ceremony needed — but nothing else should apply `plunder.*` migrations, ever.
+
 ---
 
 ## 8. Mount mechanics [PROPOSED]
@@ -610,13 +627,20 @@ bucket, DB size, Plaid environment and credential locations.
 **Gate:** dump restores cleanly into a scratch database; inventory reviewed by
 Derek. *Netlify enumeration needs Derek's session (§13).*
 
-**K1 — schema transform.** Rewrite `public` → `kraken` across the full
-migration lineage *as of the session* (166 at the 2026-08-03 count; re-counted
-at K0). Because at least 17 migrations hard-qualify `public.` (recount at K0
-too), the transform is scripted — qualification rewrite, replay into a scratch
-schema — then **validated by structural diff** against the `ucfy` original:
-tables, columns, constraints, indexes, functions, triggers, policies, count and
-definition parity. Helpers move into `kraken` with pinned `search_path`. Create
+**K1 — schema transform.** Rewrite `public` → `kraken` **and `internal` →
+`kraken_internal`** (two schemas, discovery.md §2.5 #1 — the second stays
+non-exposed; the scoped wrapper views' definer bodies and every pinned
+`search_path`, including `refresh_po_projections`'s `internal,public`, rewrite
+in lockstep) across the full migration lineage *as of the session* (166 at the
+2026-08-03 count; re-counted at K0). Because at least 17 migrations
+hard-qualify `public.` (recount at K0 too), the transform is scripted —
+qualification rewrite, replay into a scratch schema — then **validated by
+structural diff** against the `ucfy` original: tables, columns, constraints,
+indexes, functions, triggers, policies, count and definition parity. Kraken's
+own DB pitfalls #1/#2/#3/#14/#18/#20 are part of the transform spec (enum
+ADD VALUE isolation; pinned paths on MV-inlined functions and SECURITY DEFINER
+triggers; projection-object exposure; CRLF-preserving function bodies).
+Helpers move into `kraken` with pinned `search_path`. Create
 `kraken.schema_migrations` seeded with every ported version, and Kraken's own
 migration runner (§6.2).
 **Gate:** structural diff clean; Kraken's test suite passes against the scratch.
@@ -624,11 +648,15 @@ migration runner (§6.2).
 **K2 — data and auth port.** Restore data into `kraken.*` on `seaking`. Copy
 `auth.users` + `auth.identities` preserving UUIDs and password hashes — except
 Derek (and Austin if present), whose rows already exist: their old IDs are
-remapped by scripted FK rewrite driven by **the FK graph, not grep**. All
-sessions invalidate; everyone re-logs-in once.
+remapped by scripted FK rewrite driven by **the FK graph, not grep**. **The
+System service account ports at its exact fixed UUID** (every pg_cron wrapper
+impersonates it — discovery.md §2.5 #3). **Vault contents migrate explicitly**
+(a dump doesn't carry them): regenerate `cron_secret` on `seaking` + re-`secrets
+set` it; re-store the Plaid access token(s) through the store RPC (§2.5 #2).
+All sessions invalidate; everyone re-logs-in once.
 **Gate:** row-count parity per table; projection rebuild produces identical
 balances on both sides; login works for a partner, an operator, and a test
-client user.
+client user; `get_plaid_access_token` decrypts on `seaking`.
 
 **K3 — storage, functions, crons.** All **four** buckets recreated with
 prefixed names, objects copied, storage policies ported. Edge functions deployed
@@ -642,14 +670,23 @@ recreated with prefixed names and their exact schedules (`daily-fee-accrual`
 cron function runs once manually and succeeds; a Plaid sync completes against
 the production item.
 
-**K4 — realm config and the mount.** Custom SMTP live on `seaking`. Redirect
-URLs allowlisted for the shell origin and the portal. Manager gains
+**K4 — realm config and the mount.** Custom SMTP live on `seaking`. The full
+auth-config checklist from Kraken's own burn history (discovery.md §2.5 #5):
+Site URL set (it silently doubles as the fallback for any non-allowlisted
+redirect); redirect allowlist as **one wildcard entry per origin** (bare
+`/auth/callback` entries don't match the `?next=` variants resets actually
+send); the **customized token_hash Reset Password template** replicated
+verbatim (the default PKCE template dies cross-device; template ↔ app `?next=`
+coupling is load-bearing); invite templates left default; **no localhost
+entries on the production realm, ever**. Verified with Kraken's own
+`verify-auth-redirects.mjs` against `seaking`. Manager gains
 `basePath: '/kraken'` + `assetPrefix` behind env, with redirects from its
 current root paths (§8.2). The portal changes **not at all** — it keeps its own
 origin (D9).
 **Gates:** password reset delivers to an external address in seconds, not
-hours; the manager serves correctly under `/kraken` on a staging origin with
-assets, links, and server actions intact.
+hours — **opened cross-device** (request on one machine, click on another);
+the manager serves correctly under `/kraken` on a staging origin with assets,
+links, and server actions intact.
 
 **K5 — parallel verification and cutover.** Staging manager + portal pointed at
 `seaking` run alongside production — *within the session only*: this is the one
@@ -659,7 +696,10 @@ sequence: **brief prod write-freeze → final delta sync** (tables changed since
 K2's copy, re-verified by the same parity and projection checks) **→ env swap on
 the production apps + the `app.` routing flip** (the shell takes the root, the
 manager takes `/kraken` — §8.2's redirects go live; legacy env names carry
-new-format key values without code changes). The `ucfy` project stays untouched.
+new-format key values without code changes) **→ Plaid webhook re-registration**
+(the manager's `/api/plaid-webhook` route moves with the basePath; one
+`itemWebhookUpdate` call + the `PLAID_WEBHOOK_URL` env — discovery.md §2.5 #4).
+The `ucfy` project stays untouched.
 **Gate:** Derek completes a real working session on staging-manager; a real
 client completes a portal session; sign-in-once verified across the shell,
 `/manifest`, and `/kraken`; **a MANIFEST-only user is verified to get nothing
@@ -721,9 +761,8 @@ an interim host (naming folds into D15's platform decision), and the flip of
 of the K-session's cutover. Everything mounted during the S-track moves address
 once, at cutover, by design.
 
-1. **This document agreed** — D15 (§4.5, mount mechanism + platform + interim
-   host) is the decision that blocks S1. D14 is *not* needed until the
-   K-session.
+1. **This document agreed** — done: D15 decided 2026-08-06 (§4.5); nothing
+   blocks S1. D14 is *not* needed until the K-session.
 2. **§7 — the Plunder gate.** First, and independent of everything else: its
    clock is "before the second realm user," and the S-track itself is what
    creates that user (Austin, or staff). Nothing else in the estate has a
@@ -776,37 +815,34 @@ once, at cutover, by design.
 
 ## 13. Open questions
 
-**Blocking the S-track (§11 step 1):**
-
-1. **D15 — the mount mechanism** (§4.5): edge routing (recommended) or Next
-   multi-zone? Three sub-decisions travel with it: the platform (Netlify
-   recommended, accepting the rewrite of MANIFEST's two Vercel crons), and the
-   **interim origin** the S-track lives at until cutover (a Netlify subdomain
-   is enough; a `suite.seakingcapital.com` CNAME at GoDaddy is optional polish).
+**Blocking the S-track:** *none.* D15 was decided 2026-08-06 (§4.5); the
+S-track is unblocked. The interim origin's exact subdomain name is picked at S1
+and isn't worth a decision cycle.
 
 **Needed at the K-session, not before:**
 
-2. **D14 — Kraken scoping** (§5.5): universal grant-scoping with auto-grants
+1. **D14 — Kraken scoping** (§5.5): universal grant-scoping with auto-grants
    (recommended), or an unscoped admin tier?
-3. Netlify account access to enumerate both sites' env vars — needs Derek's
+2. Netlify account access to enumerate both sites' env vars — needs Derek's
    session. Read-only; doing it early shortens the K-session.
-4. Client-comms preference for the K5 re-login: email, portal banner, or both?
-5. Soak window before deleting `ucfy` (suggest 2–4 weeks).
-6. The two queued `ucfy` fixes (close signup, Resend SMTP): default is they
+3. Client-comms preference for the K5 re-login: email, portal banner, or both?
+4. Soak window before deleting `ucfy` (suggest 2–4 weeks).
+5. The two queued `ucfy` fixes (close signup, Resend SMTP): default is they
    fold into the K-session — unless Kraken's own workstream takes them earlier,
    which remains its prerogative and would be worth doing for the live SMTP
    deficiency alone.
 
 **Timing-free:**
 
-7. Does Austin review this document before build? (Recommended — D11 and §5.4
+6. Does Austin review this document before build? (Recommended — D11 and §5.4
    concern him directly, and he is the likely second realm user, which trips
    §7 the moment the S-track would add him.)
 
-**Outstanding discovery** (discovery.md §11 tail): the §8.5 cookie test ·
-Kraken's locked decisions + `ARCHITECTURE.md` · Plunder's Actions workflow ·
-Harpoon docs + the Deepwatch webhook · `ucfy` cron bodies, `invoke_edge_job`,
-secret names.
+**Outstanding discovery** (discovery.md §11 tail — the five repo passes all
+closed 2026-08-06 into §2.5/§3/§4.1/§5): the §8.5 cookie test (S1's first
+experiment) · `ucfy` live-state confirmation at K0 (now a checklist, not an
+unknown) · Netlify env enumeration (Derek's session) · experiment repos'
+GitHub archival (optional).
 
 **Design debts acknowledged, not blocking:** MANIFEST own-addresses before
 Austin's instance · JWT claims optimization only if per-request membership reads

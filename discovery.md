@@ -54,15 +54,35 @@ Nine systems/artifacts found. Three were previously unknown to the suite convers
 | App email | `RESEND_API_KEY` in portal env — app-layer email is on Resend | working-copy `.env.local` names |
 | Auth email (SMTP) | **NOT configured** — password resets for the real client ride Supabase built-in free-tier email **today** | `SMTP_HOST` empty in auth config |
 | Signup | **OPEN** (`DISABLE_SIGNUP: false`) on a production financial realm | auth config |
-| Edge functions | Repo has 7 function dirs + `_shared`; platform functions endpoint returned **empty**. How the `-email` crons deliver, and whether functions are deployed at all, is **[UNVERIFIED]** — pin down `invoke_edge_job`'s definition and each cron job's `command` at K0 | repo tree vs platform API |
+| Edge functions | ~~Repo has 7 function dirs + `_shared`; platform functions endpoint returned **empty**. How the `-email` crons deliver, and whether functions are deployed at all, is **[UNVERIFIED]**~~ **Corrected 2026-08-06 from Kraken's own docs (§2.5): functions ARE deployed and live-verified repeatedly** (aged-out-warning, weekly-digest, projection-drift-check, gl-audit, plaid-sync, insurance-claim-deadlines, state-of-default-reminder). Delivery mechanism resolved: pg_cron → `invoke_edge_job(name)` → pg_net async POST with `verify_jwt` ON + an `x-cron-secret` header checked against a Vault-held secret (`cron_secret`; `get_cron_secret()` is the service-role-only mirror). Email = Resend REST via fetch. The 2026-08-03 platform-API query that returned empty was wrong or mis-scoped — re-enumerate from the dashboard at K0 | Kraken `CLAUDE.md` (2026-07-04 entries, live-verification records) |
 | Secrets | Project secrets exist; names not enumerable through the tooling used (redacted) — inventory at K0 from dashboard | platform secrets endpoint |
 
 ### 2.4 Flags (found, not fixed — nothing was changed on `ucfy`)
 
-1. **Open signup on production.** Stray signups get no `users` row → no data (deny-by-default holds), but a public financial system accepting signups is at minimum hygiene debt. **[ASK]** intentional (invite flow dependency?) or oversight — if oversight, fix on `ucfy` now, independent of any port.
-2. **No custom SMTP** while a real client can request password resets. Pre-existing risk, not port-introduced. Candidate for fixing on `ucfy` immediately.
-3. Unpushed working-copy commits (2.1).
-4. `apps/jobs` is a stub — no runtime to port.
+1. **Open signup on production.** Stray signups get no `users` row → no data (deny-by-default holds), but a public financial system accepting signups is at minimum hygiene debt. **[ASK]** intentional (invite flow dependency?) or oversight — if oversight, fix on `ucfy` now, independent of any port. *(Resolved §10a: close it — deferred behind the freeze.)*
+2. **No custom SMTP** while a real client can request password resets. Pre-existing risk, not port-introduced. *(Resolved §10a: Resend — deferred behind the freeze.)*
+3. Unpushed working-copy commits (2.1). *(Resolved §10a: pushed.)*
+4. `apps/jobs` is a stub — no runtime to port. *(Still true 2026-08-06: the edge functions live at `supabase/functions/`; `apps/jobs/README.md` is the subsystem doc.)*
+
+### 2.5 Kraken context appendix (read 2026-08-06: `CLAUDE.md` full read + `ARCHITECTURE.md` §2)
+
+The locked-decisions read the discovery tail owed. Everything here is from Kraken's own docs, which are unusually rigorous (dated decisions, per-bug pitfall log, live-verification records). Suite-relevant facts only — the full detail lives in the repo.
+
+**Locked decisions the suite must defer to** (headline set; `CLAUDE.md` "Decisions already locked"): integer-cents money; three-part PO key; append-only `ledger_events` (trigger-enforced, even against service_role); RLS deny-by-default with *"RLS is the authority"*; **no loan vocabulary anywhere** (advance/fees/Client — never loan/interest/borrower); **balances never forgiven** (no write-off action exists; the term is banned from UI); the legal-default waterfall (2026-07-03, per the OLS Factoring/PSA docs); **batches removed entirely** (2026-07-10 teardown); every money-moving RPC serializes on a shared per-Client advisory lock; fees prospective / BB retroactive.
+
+**Facts that change the port runbook** (fold into suite-design §9 — done 2026-08-06):
+
+1. **Kraken spans TWO schemas now, not one.** Migration 20260704150001 moved the 10 projection objects (4 MVs + 6 views) into a non-PostgREST-exposed **`internal` schema**, with scoped SECURITY DEFINER wrapper views at the original `public` names (`is_service_request() OR client_id IN current_user_client_ids()`). `refresh_po_projections` runs with `search_path=internal,public`. The K1 transform is therefore `public → kraken` **plus** `internal → kraken_internal` (name at K1; the property that matters is non-exposure), with the wrappers' definer bodies and pinned search_paths rewritten in lockstep. Rationale recorded as pitfall #18: views bypass RLS, MVs have none — the wrapper layer IS the tenant boundary for projections.
+2. **Supabase Vault is load-bearing.** Two uses: the `cron_secret` (edge-function auth; generated inside the DB, never in git) and **Plaid access tokens** (migration 20260709120017 dropped the plaintext column; `plaid_items.access_token_secret_id` points into Vault; store/get RPCs + a delete trigger). A pg_dump does not carry Vault → **K2 must migrate Vault secrets explicitly** (re-store tokens via the RPCs on the new project).
+3. **The System service account** (fixed UUID `00000000-…-000000000001`; `auth.users` + `users` rows, role `operator`, status `disabled`, non-login) is how pg_cron calls guarded RPCs: SECURITY DEFINER wrappers set `request.jwt.claim.sub` to it (pitfall #17). **K2 must preserve this user at its exact UUID.**
+4. **Plaid webhook is registered on the live Chase item** pointing at `app.seakingcapital.com/api/plaid-webhook` (instant sync; ES256-verified). The manager's move to `/kraken` moves that route → **webhook re-registration (`itemWebhookUpdate`) is a cutover step**; `resolvePlaidWebhookUrl` prefers `PLAID_WEBHOOK_URL` env, so it's an env change + one registration call.
+5. **Auth realm config that lives only in the dashboard** — the K4 checklist, verbatim from their trap writeups: Site URL (`https://app.seakingcapital.com`) **doubles as the silent fallback for any non-allowlisted redirect** — a portal misconfiguration dumps Clients on the Manager sign-in with no error; redirect allowlist must be **one wildcard entry per origin** (`https://host/**` — bare `/auth/callback` entries do NOT match `?next=` variants, which is exactly what resets send; scheme-exact); the **Reset Password email template is customized** to the `token_hash`/OTP flow (`{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=recovery`) because the default PKCE flow dies cross-device — and the template + the apps' `?next=` are **load-bearing in both directions**; other templates stay default. **Never add localhost entries to the production realm** (anyone with the anon key could aim a live recovery token at the recipient's own machine). Post-change verification: `node docs/diagnostics/verify-auth-redirects.mjs` (~10s, probes every origin × path shape). Invites deliberately use `{{ .ConfirmationURL }}` — leave them.
+6. **Dev and prod share the one `ucfy` project** — there is no separate Kraken dev project. (After the port: dev and prod share `seaking`. Same posture, bigger blast radius — worth revisiting someday, not now.)
+7. **Migration lineage is mixed-format and growing**: sequential `0001…` files then timestamped `20260531…+`; 166 was the 2026-08-03 parity count, 20260806120001 has already landed. 20 documented DB pitfalls, several of which ARE the K1 transform spec: #2 (SQL functions inlined in MVs need pinned `search_path`), #3/#14 (SECURITY DEFINER + pinned path on triggers touching RLS'd tables), #1 (enum ADD VALUE solo-migration), #18 (projection-object exposure), #20 (CRLF bodies from Windows-authored migrations — `pg_get_functiondef` preserves them; normalize before splicing).
+8. **Netlify's deploy gate keys on the git PUSH ACTOR**, not commit authorship — pushes must go out under the `SKCAccount` credential or they silently never deploy (three days of pushes were once blocked this way). Any suite-side deploy tooling for the shell inherits this rule.
+9. **RLS helper inventory** (ARCHITECTURE.md §2): `current_user_client_ids()`, `is_manager()`, `is_admin_manager()`, `is_client_user()`, plus `is_service_request()` from the wrapper layer — all in `public` today, all move + pin at K1. Auth callback handles both PKCE (`?code=`) and OTP (`?token_hash=`) shapes in one route; invite and reset flows are documented end-to-end and unchanged by the port except for origins.
+
+**Estate-level correction**: §1's "8 daily crons" and §2.3's cron row remain accurate as of 2026-08-03, and the cron *bodies* are now known from docs (per-job: daily-fee-accrual = in-DB RPC via System-user wrapper at 06:00 UTC; the rest invoke deployed edge functions via `invoke_edge_job`). K0 still confirms live state, but this is no longer an unknown — it's a checklist.
 
 ---
 
@@ -70,7 +90,11 @@ Nine systems/artifacts found. Three were previously unknown to the suite convers
 
 - **What it is** (its own README): nightly engine finding in-person events "dense with qualified buyers," scoring for relevance/accessibility/cost, review dashboard for the keep/skip decision. Active: last commit 2026-07-30 (specialty-finance sources), last run **2026-08-03 10:16 UTC**, 643 runs total, 959 events scored.
 - **Architecture**: `apps/worker` (Node/tsx CLI — the nightly entrypoint), `apps/dashboard` (React/Vite review UI), `packages/{core,db,ingest,config}`. DB client pins `schema: 'plunder'` — it adopted the suite convention independently.
-- **The runner is GitHub Actions cron** (README M11: "GitHub Actions cron drives the nightly chain and the Monday digest"). Nightly chain: `worker run --all && worker score && worker detect`. **Consequence: GitHub repo secrets hold a direct database credential (`PLUNDER_DATABASE_URL`) to `seaking`** plus `DEEPSEEK_API_KEY`. The suite's secrets map (§8) must include GitHub Actions as a credential holder.
+- **The runner is GitHub Actions cron** (README M11: "GitHub Actions cron drives the nightly chain and the Monday digest"). ~~Nightly chain: `worker run --all && worker score && worker detect`~~ **Workflow files read 2026-08-06** (`.github/workflows/nightly.yml` + `digest.yml`), exact facts:
+  - **nightly**: cron `30 6 * * *` (06:30 UTC ≈ 01:30/02:30 ET), 60-min timeout, concurrency group `plunder-worker` + an in-DB advisory lock backstop. Chain: `pnpm worker migrate` → `sync-sources` (config→DB upsert, never deletes) → `run --all --due` (each source's own `scheduleCron` decides participation — the weekly Brave discovery matrix fires Sundays only) → `score` → `detect` → `runs --limit 40`. Playwright Chromium installed per run (renderer).
+  - **⚠ `worker migrate` runs in CI nightly** — Plunder's migrations auto-apply from GitHub Actions on every nightly run. Its deploy runner *is* the nightly workflow. Any suite change touching `plunder.*` must land through Plunder's own migration dir or the nightly will fight it; conversely the §3.1 policy-gate migration ships by merging to Plunder's main and letting the nightly (or a manual `workflow_dispatch`) apply it.
+  - **digest**: cron `0 12 * * 1` (Mon 12:00 UTC ≈ 08:00 EDT), idempotency-keyed, dry-runs harmlessly without a Resend key.
+  - **Full GitHub-secrets inventory** (both workflows): `PLUNDER_DATABASE_URL` (direct Postgres to `seaking`), `DEEPSEEK_API_KEY`, `ANTHROPIC_API_KEY` (auto-detect prefers Anthropic when both exist — cost note in the workflow comment), `PLUNDER_EXTRACTION_PROVIDER` / `PLUNDER_SCORING_PROVIDER` / `PLUNDER_DETECT_PROVIDER` (pins), `DISCOVERY_SEARCH_PROVIDER` + `DISCOVERY_SEARCH_API_KEY` (Brave), `RESEND_API_KEY`, `DIGEST_FROM_EMAIL`, `DIGEST_TO_EMAIL`. **Consequence confirmed: GitHub Actions is a first-class credential holder for `seaking`** — and Plunder has its own Resend key (email map §8.3 updated).
 - **Dashboard runs locally** (Vite dev; no deployment found) against `VITE_PLUNDER_SUPABASE_URL` + anon key.
 - **Migrations**: 10, in-app tracker `plunder._migrations` (`0001_init` → `0010_factoring_abl_category`). Its CLI history is the frozen `supabase_migrations` (26 rows).
 
@@ -91,17 +115,25 @@ This is the deny-by-default violation §4 of the design doc treats as the cardin
 
 ## 4. Harpoon — findings
 
-- **What it is**: "Award-triggered govcon origination agent" (its pyproject). Python. Watches government contract awards (`SAM_API_KEY` = SAM.gov) and originates outreach: search + verifier providers, **Twilio** (SID + auth token), **its own Gmail OAuth** (client id/secret/refresh token), LLM keys (`ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`), `DOC_ENGINE_WEBHOOK_URL` (→ almost certainly Deepwatch integration — **[UNVERIFIED]**), `ALLOW_THIRD_PARTY_PII` + `HARPOON_DRY_RUN` flags.
+- **What it is**: "Award-triggered govcon origination agent" (its pyproject). Python. Watches government contract awards (`SAM_API_KEY` = SAM.gov) and originates outreach: search + verifier providers, **Twilio** (SID + auth token), **its own Gmail OAuth** (client id/secret/refresh token), LLM keys (`ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`), `DOC_ENGINE_WEBHOOK_URL` ~~(→ almost certainly Deepwatch integration — **[UNVERIFIED]**)~~ **resolved 2026-08-06, see §4.1**, `ALLOW_THIRD_PARTY_PII` + `HARPOON_DRY_RUN` flags.
 - **Runtime**: Docker compose. `harpoon-queue` (up 15h, healthy, restart unless-stopped) = "the always-on half: approval queue, pipeline board, lead pages, Run panel" — **bound to 127.0.0.1:8010 deliberately: "This database holds lead PII; do not expose it on the LAN."** A `harpoon-scheduler` service exists behind a compose profile and is **not running**. A Windows scheduled task **"Harpoon Warmup"** runs `python -m harpoon.cli warmup` **weekly** (last: 2026-08-03 09:30, exit 0).
 - **Data**: SQLite at `/var/lib/harpoon` (Docker volume `harpoon_harpoon-db`) — not on Supabase at all. Backup story **[UNVERIFIED]**.
 - **Secrets hygiene**: the Google OAuth `client_secret_*.json` in the repo dir **is gitignored** ✓; live secrets are injected via compose env.
-- **Suite relevance**: no shared auth surface today (localhost UI, single operator). Its future in the one-sign-in world (does the queue UI ever leave localhost?) is an [ASK] for the design doc revision. Docs are rich (`WORKFLOWS.md`, `apis.md`, capability letter) — read before designing anything for it.
+- **Suite relevance**: no shared auth surface today (localhost UI, single operator). Future: joins the web surface eventually (§10a #7); PII posture travels with it. Docs read 2026-08-06 — see §4.1.
+
+### 4.1 Harpoon docs pass (2026-08-06: `WORKFLOWS.md`, `apis.md`, `handoff.py`)
+
+- **The Deepwatch webhook question, resolved three ways**: (1) `handoff.py` is the sending half — when Derek marks a lead `qualified_for_terms`, Harpoon assembles an intake packet (dossier + thread + state counters) and POSTs it to `DOC_ENGINE_WEBHOOK_URL`, then **locks the lead** (economics talk refused thereafter — "terms, disclosures, and every number live in the document engine, never here"); per-state counters increment only via the doc-engine callback. (2) **The live `.env` value is EMPTY** — the POST is skipped (`webhook_configured=false`), the lock still happens; the code stubs gracefully. (3) **Deepwatch has no receiving endpoint** — its server routes are `/api/inputs|preview|render|save-profile` only; zero `intake`/`harpoon` references in its code. **Verdict: the integration is designed on Harpoon's side, unbuilt on Deepwatch's, unwired in between.** The design intent (Deepwatch as the doc engine) is confirmed by shape, not by configuration.
+- **Safety model** (WORKFLOWS.md §5 — this is the PII posture that must travel to any web mount): human gate on every send; dry-run default (`HARPOON_DRY_RUN=0` + a send tick required); compliance-as-code (lexical linter, dossier grounding, structural rules, 100% test coverage enforced); global kill switch on bounce/spam signals; permanent suppression; **PII tokenization** — DeepSeek (cost-tier drafting) never sees contact PII (tokenized out and restored post-response); reply drafting stays on Anthropic.
+- **External services** (§6 + apis.md): USAspending (no key), SAM.gov Entity API, MailRook/NeverBounce verifier, optional Google CSE/SerpAPI, Anthropic, DeepSeek, Gmail API (OAuth, isolated domain), Twilio Lookup v2 (line-type only — mobile ⇒ email-only). FPDS adapter removed 2026-07-18.
+- **Runtime shape** (§7): two long-lived processes over SQLite WAL — consistent with the queue container + the dormant scheduler profile.
 
 ## 5. Deepwatch — findings
 
 - "Deterministic conditional document assembly engine" — assembles deal documents from fragments/corpus with conditional logic (FOREACH, draft gating, bounded enumeration per its build log). Renamed SENTINEL → DEEPWATCH 2026-07-12. Python, venv-bound.
-- **Git repo with no remote, clean tree, local-only.** One disk failure loses the entire system. Highest-priority operational flag outside Kraken. **[ASK]**: push to `SKCAccount/DEEPWATCH`.
-- Integration hypothesis: Harpoon's `DOC_ENGINE_WEBHOOK_URL` points at it (capability letters for govcon outreach). **[UNVERIFIED]** — confirm from Harpoon config values or docs.
+- **Git repo with no remote, clean tree, local-only.** One disk failure loses the entire system. Highest-priority operational flag outside Kraken. **[ASK]**: push to `SKCAccount/DEEPWATCH`. *(Resolved §10a #4: pushed 2026-08-03.)*
+- Integration hypothesis: Harpoon's `DOC_ENGINE_WEBHOOK_URL` points at it (capability letters for govcon outreach). ~~**[UNVERIFIED]**~~ **Resolved 2026-08-06 — see §4.1: intended yes, wired no.** Deepwatch has no intake endpoint; the env var is empty.
+- **Docs pass (2026-08-06)**: README is one line ("Deal onboarding engine — background check, document preparation"); `BUILD_LOG.md` is the real doc — v5 engine (list inputs + FOREACH, draft gating, bounded enumeration), all spec phases 0–4 complete 2026-07-13, re-architected 2026-07-26, "engine feature-complete." Repo layout: `engine/` (incl. a **dependency-free stdlib HTTP server** serving a single-page `ui/index.html` locally), `corpus/`, `fragments/`, `assemblies/`, `profiles/`, `deals/`, `out/`, `phase0/`, tests. **It already has a local web UI** — server prints `DEEPWATCH UI -> http://host:port`. Suite mount someday = this UI behind a membership check; nothing blocks on it.
 
 ## 6. MANIFEST — reference
 
@@ -130,20 +162,22 @@ Ref `oznvdznekexdgblmxwqr`, named `seaking` (renamed from `plunder` 2026-08-03).
 
 | Trigger | System | What |
 |---|---|---|
-| pg_cron on `ucfy` ×8 | Kraken | fee accrual, drift check, gl-audit, plaid-sync, notice emails, digest |
-| GitHub Actions cron | Plunder | nightly chain + Monday digest |
+| pg_cron on `ucfy` ×8 | Kraken | fee accrual (in-DB RPC via System user, 06:00 UTC), drift check, gl-audit, plaid-sync, notice emails, digest — the rest via `invoke_edge_job` → pg_net → deployed edge functions (§2.5) |
+| (event) Plaid webhook → `app.seakingcapital.com/api/plaid-webhook` | Kraken | instant transaction sync on bank activity; nightly job is the backstop (§2.5 #4) |
+| GitHub Actions cron ×2 | Plunder | nightly 06:30 UTC (incl. `worker migrate` — CI auto-applies migrations!) + digest Mon 12:00 UTC (§3) |
 | Windows Task "Harpoon Warmup" weekly | Harpoon | `harpoon.cli warmup` |
 | (dormant compose profile) | Harpoon | `harpoon-scheduler` |
-| (pending) Vercel cron | MANIFEST | gmail hourly / gcal 4-hourly per `vercel.json` |
+| ~~(pending) Vercel cron~~ **(pending) Netlify scheduled functions** per D15 | MANIFEST | gmail hourly (:17) / gcal 4-hourly (:42) — rewritten from `vercel.json` at S2 |
 
 ### 8.3 Email map
 
 | Path | Used by | State |
 |---|---|---|
-| Supabase built-in SMTP on `ucfy` | Kraken auth mail (incl. client password resets) | **free-tier limits, live today** ⚠ |
-| Resend (app-layer) | Kraken portal notifications | key present in portal env |
+| Supabase built-in SMTP on `ucfy` | Kraken auth mail (incl. client password resets) | **free-tier limits, live today** ⚠ — and the reset template is customized (token_hash flow); must be replicated at K4 (§2.5 #5) |
+| Resend (app-layer) | Kraken portal notifications + advance-request email + edge-function jobs (aged-out warnings, weekly digest, drift/audit alarms) | keys in portal env + function secrets |
 | Supabase built-in on `seaking` | MANIFEST magic-link recovery | fine while single-user |
-| Kraken cron `-email` jobs | delivery mechanism **[UNVERIFIED]** (edge functions? pg_net→Resend?) | resolve at K0 |
+| ~~Kraken cron `-email` jobs — mechanism **[UNVERIFIED]**~~ | **Resolved (§2.5): deployed edge functions → Resend REST** | confirm live at K0 |
+| Resend via Plunder's GitHub secrets | Plunder Monday digest (`DIGEST_FROM_EMAIL` → `DIGEST_TO_EMAIL`) | found 2026-08-06 in `digest.yml` |
 | Harpoon Gmail OAuth | its own outreach sending | separate from everything above |
 
 ### 8.4 Domains (GoDaddy DNS, verified by resolution)
@@ -202,6 +236,8 @@ Consequences recorded with it:
 2. **The suite builds at an interim origin.** `app.seakingcapital.com` *is* the manager today; the shell cannot occupy that root until the extended session claims it. The S-track (shell, MANIFEST mount, toggles) lives on an interim host until cutover; the `app.` flip is part of the session. Interim host naming: small [OPEN], folds into the D15 decision.
 3. The suite-side freeze on `ucfy`/Netlify effectively stands until that session — the session's green light and the freeze-lift are the same moment. Read-only discovery on `ucfy` (cron bodies, env enumeration with Derek) remains allowed anytime and shortens the session.
 
+**Decision, 2026-08-06 (Derek): D15 approved as recommended.** Mount mechanism = **edge routing at the platform level** (option b — routing rules proxy `/manifest`, `/kraken`, … to independent deployments; the shell serves `/` only and sits outside every tool's request path). With it, the travelling sub-decisions: **platform = Netlify** (MANIFEST's two Vercel crons become Netlify scheduled functions at S2), and the S-track builds at an **interim origin** on a Netlify subdomain (exact name chosen at S1; a `suite.seakingcapital.com` CNAME is optional polish). D15 closes; the S-track is unblocked. Same message, Derek: continue discovery, including reading where Kraken's schema sits today — repo-level understanding now, even though the port itself stays last.
+
 The §10 answers:
 
 1. **Plunder gate: yes** — and generalized: account setup becomes per-system yes/no toggles ("Kraken access? Plunder access? …"), admin-driven; unpermissioned tools don't even appear in the main dash. Toggles = membership rows; the "main dash" implies a **suite shell/launcher** (see #9).
@@ -236,4 +272,16 @@ The §10 answers:
 
   **(3) Mid-session, Derek added the build-order decision** (§10a above): suite built in parallel excluding Kraken; Kraken port is the last task, one extended session, clean cutover, no dual existence. Folded into the design doc (D13 decided in shape; §9 preamble; §11 restructured into the S-track and the K-finale; interim-origin consequence stated).
 
-**Still to examine (next discovery sessions):** Kraken `CLAUDE.md` "Decisions already locked" + `ARCHITECTURE.md` full read into a Kraken context appendix · Plunder GitHub Actions workflow file (exact schedule, secret names) · Harpoon `WORKFLOWS.md`/`apis.md` + confirm Deepwatch webhook integration · Deepwatch docs pass · `ucfy` cron job `command` bodies + `invoke_edge_job` definition + secrets names · Netlify env enumeration [needs #8 above] · the two experiment repos' disposition · **the cookie-jar test** (§8.5: do `@supabase/ssr` 0.5.2 and 0.7.0 interoperate on one cookie? — decides whether the version pin is a prerequisite or a cleanup).
+- **2026-08-06, later (same session)** — **D15 decided** (§10a): edge routing on Netlify, shell out of every tool's request path, interim origin on a Netlify subdomain; S-track unblocked. Then the five outstanding repo discovery passes, all executed:
+
+  **Kraken** (`CLAUDE.md` full read + `ARCHITECTURE.md` §2) → **new §2.5 appendix.** Headlines: Kraken spans `public` + a non-exposed **`internal` schema** (projection wrappers = the tenant boundary); **Vault holds the cron secret and Plaid access tokens** (a dump won't carry them — K2 migrates explicitly); a fixed-UUID **System service account** underpins every pg_cron job; the **Plaid webhook** is registered against `app.seakingcapital.com` (re-register at cutover); the auth realm's dashboard config (Site-URL fallback trap, wildcard-per-origin allowlist, customized token_hash reset template, no-localhost rule) is documented from their own burn history and becomes the K4 checklist; **edge functions ARE deployed** — the 2026-08-03 "platform endpoint empty" finding was wrong and is struck through in §2.3; dev and prod share `ucfy`; 20 DB pitfalls, several being the K1 transform spec. Design doc updated the same hour (K1/K2/K3/K4 additions).
+
+  **Plunder** (both workflow files) → §3 rewritten with exact crons, the full 11-name secret inventory, and the sleeper fact: **`worker migrate` runs in the nightly CI** — Plunder's deploy runner is GitHub Actions itself, so the §3.1 policy-gate migration ships by merge + nightly (or manual dispatch).
+
+  **Harpoon** (docs + `handoff.py` + live `.env`) → new §4.1. The Deepwatch webhook: **designed (sending half built, lead-locking semantics), unwired (env empty), unbuilt on the receiving side.** Safety/PII model recorded — it is the posture any future web mount must preserve.
+
+  **Deepwatch** (README, BUILD_LOG, `engine/server.py`) → §5 updated: engine feature-complete (v5), **already has a local single-page web UI** on a stdlib server; no intake endpoint.
+
+  Cross-cutting maps (§8.2, §8.3) updated: Plaid webhook row, Plunder's Resend, MANIFEST's crons → Netlify scheduled functions per D15.
+
+**Still to examine (next discovery sessions):** `ucfy` live-state confirmation at K0 (cron rows, function list, secrets names — now a checklist §2.5 rather than an unknown) · Netlify env enumeration [needs Derek's session] · the two experiment repos' GitHub disposition (archive or not — optional cleanup) · **the cookie-jar test** (§8.5: do `@supabase/ssr` 0.5.2 and 0.7.0 interoperate on one cookie? — first experiment of S1) · Harpoon's `reviews/` + capability-letter docs when its mount design actually starts.
