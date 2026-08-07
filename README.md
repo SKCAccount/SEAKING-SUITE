@@ -28,6 +28,16 @@ belong to none of them.
 4. **Discovery before build.** New facts go into discovery.md with evidence and
    a dated log entry; decisions get recorded before anything is built on them.
 
+## Shorthand used throughout these docs
+
+| Term | What it means |
+|---|---|
+| **`ucfy`** | Kraken's own Supabase project, ref `ucfyfnwkxzryywuomool` — the database, auth realm, storage, and cron behind production Kraken today. Referred to by the first four characters of its ref because that is how the dashboard and CLI identify it. |
+| **`seaking`** | The combined Supabase project, ref `oznvdznekexdgblmxwqr` — hosts MANIFEST and Plunder now, Kraken after the port. Named, not ref-shorthanded, because it was renamed to `seaking` on 2026-08-03. |
+| **The port / K0–K6** | Moving Kraken off `ucfy` onto `seaking`. Phased runbook in suite-design §9. |
+| **Soak** | The wait between cutover and deleting the old project — Kraken runs on `seaking` while `ucfy` sits untouched as a rollback, until enough of a full business cycle has passed to trust it. |
+| **S-track / K-session** | The two-track build order (D13): everything except Kraken now; Kraken last, in one extended cutover session. |
+
 ## The estate, in one line each
 
 Kraken (production PO-financing/AR-factoring, Netlify + own Supabase project,

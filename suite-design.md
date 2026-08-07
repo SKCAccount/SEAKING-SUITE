@@ -830,9 +830,13 @@ and isn't worth a decision cycle.
 
 1. **D14 — Kraken scoping** (§5.5): universal grant-scoping with auto-grants
    (recommended), or an unscoped admin tier?
-2. Netlify account access to enumerate both sites' env vars — needs Derek's
-   session. Read-only; doing it early shortens the K-session.
-3. Client-comms preference for the K5 re-login: email, portal banner, or both?
+2. Netlify account access to enumerate both sites' env vars — **Derek will
+   provide later** (2026-08-07); read-only, and doing it before the K-session
+   shortens it. Not blocking until K0.
+3. ~~Client-comms preference for the K5 re-login~~ **Decided 2026-08-07:
+   email from Derek.** One notice to the affected Client before cutover, one
+   after; no portal banner. The portal's own sign-in is unchanged (it keeps
+   its origin, D9) — the only Client-visible effect is a single re-login.
 4. Soak window before deleting `ucfy` (suggest 2–4 weeks).
 5. ~~The two queued `ucfy` fixes (close signup, Resend SMTP)~~ **Resolved
    2026-08-07: handed to the Kraken workstream**, launch prompt at
@@ -842,9 +846,12 @@ and isn't worth a decision cycle.
 
 **Timing-free:**
 
-6. Does Austin review this document before build? (Recommended — D11 and §5.4
-   concern him directly, and he is the likely second realm user, which trips
-   §7 the moment the S-track would add him.)
+6. ~~Does Austin review this document before build?~~ **Decided 2026-08-07: no
+   review needed.** Consequence to carry: he was also the likely trigger for
+   §7's gate (the second realm user). With no review step, nothing announces
+   his arrival in advance — so **§7 must simply be closed before the S-track
+   creates any second account**, which is already its sequencing (§11 step 2).
+   D11 (MANIFEST per-user) and §5.4 stand as written.
 
 **Outstanding discovery** (discovery.md §11 tail — the five repo passes all
 closed 2026-08-06 into §2.5/§3/§4.1/§5): the §8.5 cookie test (S1's first
