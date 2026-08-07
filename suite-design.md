@@ -35,7 +35,7 @@ Open items are collected in §13.
 | D11 | MANIFEST is per-user: one instance per person, never a shared rolodex | **[DECIDED]** 2026-08-03 |
 | D12 | No `supabase db push` against the combined project — per-system migration ledgers | **[LIVE]** for MANIFEST; Kraken adopts at port |
 | D13 | **Kraken comes last.** The suite is fully set up excluding Kraken; then one extended session ports and cuts over — Kraken never exists in two places | **[DECIDED]** 2026-08-06 in shape; runbook detail **[PROPOSED]** §9 |
-| D14 | Kraken's manager scoping model under the suite | **[OPEN]** — two options in §5.5; needed at the K-session, not before |
+| D14 | **Universal grant-scoping stays**; "admin sees all" is maintained by auto-granting designated partners/admins on client creation | **[DECIDED]** 2026-08-07 — §5.5 option (a) as recommended |
 | D15 | Tools mount via **edge routing** on **Netlify**; shell serves `/` only, outside every tool's request path; S-track at an interim Netlify origin | **[DECIDED]** 2026-08-06 — §4.5 option (b) as recommended |
 
 ---
@@ -409,7 +409,7 @@ in Kraken as `admin_manager` rows like anyone else — what makes them partners 
 which *other* systems they hold membership in. This keeps Kraken's role enum
 meaning exactly what its whole migration lineage already assumes.
 
-### 5.5 Kraken manager scoping — the open model question (D14)
+### 5.5 Kraken manager scoping (D14) — DECIDED 2026-08-07: option (a)
 
 Verified behavior today: **all manager-tier users, including admin managers, see
 and write only clients they hold `user_client_access` grants for.** Derek's
@@ -425,9 +425,16 @@ stated intent was "a Manager sees assigned clients; an admin still sees it all."
   policy the 2026-07-17 hardening spent a migration closing. Every future policy
   must handle the bypass correctly, forever.
 
-**Recommendation: (a).** The hardening migration is an argument from
-experience: unscoped tiers are where Kraken's own review found its gaps.
-[OPEN — Derek decides.]
+**Decided: (a)** (Derek, 2026-08-07). The hardening migration is an argument
+from experience: unscoped tiers are where Kraken's own review found its gaps.
+And the posture has now been arrived at twice independently — the 2026-07-17
+hardening closed the write side, and the 2026-08-06 `clients_write` split made
+admin *visibility* grant-driven too (Kraken pitfall #19), verified against
+Derek's own grants before shipping. Option (b) would have unwound both.
+
+Implementation, at the K-session: a trigger auto-granting designated
+partner/admin users on client creation, so "all" stays true without a policy
+bypass. Every read remains grant-auditable.
 
 ### 5.6 External users, stated as tests
 
@@ -827,10 +834,11 @@ and isn't worth a decision cycle.
    session. Read-only; doing it early shortens the K-session.
 3. Client-comms preference for the K5 re-login: email, portal banner, or both?
 4. Soak window before deleting `ucfy` (suggest 2–4 weeks).
-5. The two queued `ucfy` fixes (close signup, Resend SMTP): default is they
-   fold into the K-session — unless Kraken's own workstream takes them earlier,
-   which remains its prerogative and would be worth doing for the live SMTP
-   deficiency alone.
+5. ~~The two queued `ucfy` fixes (close signup, Resend SMTP)~~ **Resolved
+   2026-08-07: handed to the Kraken workstream**, launch prompt at
+   [`kraken-auth-handoff.md`](kraken-auth-handoff.md). Not suite work. K4's
+   realm config should read whatever configuration that session records in
+   Kraken's `CLAUDE.md` rather than re-deciding it.
 
 **Timing-free:**
 
