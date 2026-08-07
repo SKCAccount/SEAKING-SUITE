@@ -121,7 +121,7 @@ Structure:
 
 1. **What this is** — purpose and outcome, in Derek's confirmed words. First
    thing in the file, because it is what every ambiguous request gets resolved
-   against.
+   against. **Structure it the way Kraken's does** — see the template below.
 2. **Where it stands today** — honest state. What runs in real use, what is
    half-built, what is stubbed, what is abandoned-but-still-present. This
    section is what lets a future session propose a sensible next step.
@@ -162,6 +162,71 @@ Structure:
 Mark anything you believe but could not confirm as **[UNVERIFIED]**. That tag
 is more useful than a confident sentence, because the next session knows to
 check it rather than build on it.
+
+### The purpose statement — structure it like Kraken's
+
+Kraken's is the model, and it is worth studying because of how *short* it is.
+Roughly 120 words, no feature list, no architecture, no roadmap — and it is
+still enough to resolve most ambiguous requests. Here it is in full:
+
+> **What this app is**
+>
+> Sea King Capital provides two forms of financing to CPG companies:
+>
+> - **PO financing** — advance capital against a retailer's purchase order
+>   before fulfillment. The PO is collateral.
+> - **AR factoring** — advance capital against an invoice. The invoice is
+>   collateral; when the retailer pays, we collect.
+>
+> This monorepo is the system of record. It replaces Excel. Every PO, invoice,
+> advance, fee, payment, and remittance flows through it. Users: Manager
+> (Admin/Operator), Client (read-only portal + advance requests), and stubbed
+> Investor/Creditor roles.
+>
+> Derek is the founder, primary user, and a beginner developer. Favor explicit
+> clarity over cleverness. Complete updated files over snippets when
+> refactoring.
+
+Six moves. Reproduce all six for your tool:
+
+1. **The real-world activity that creates the need** — start outside the
+   software. Kraken opens with what the *company* does, not what the app does.
+   For your tool: what is Derek actually trying to accomplish in his business
+   or his week?
+2. **The domain primitives, defined in one line each, with the thing that
+   matters about each** — Kraken defines its two financing products and, for
+   each, names the collateral. These are the nouns the whole system
+   manipulates; a session that misreads them misreads everything downstream.
+3. **What role the software plays, and what it replaces.** *"This monorepo is
+   the system of record. It replaces Excel."* — **this is the most load-bearing
+   sentence in the file**, because naming what it replaces implies the
+   condition under which it is succeeding. Get this line right above all
+   others. Candidates to test with Derek: does this tool replace a manual
+   process he'd otherwise do by hand, a thing he'd otherwise pay for, or a
+   thing he simply couldn't do at all before?
+4. **Scope as a flow list** — *"Every PO, invoice, advance, fee, payment, and
+   remittance flows through it."* This is a boundary in disguise: it says what
+   belongs here, and by omission what does not. Write the equivalent sentence
+   for your tool.
+5. **Who uses it, by role**, including roles that exist but are stubbed. Some
+   of these tools have exactly one user (Derek) — say so plainly; "single
+   operator, no other humans" is a real and useful constraint.
+6. **Who Derek is, and what that implies for how to work here.** Kraken's
+   version draws a direct consequence: beginner developer → favor explicit
+   clarity over cleverness, complete files over snippets. Draw the consequence
+   that fits your tool rather than copying Kraken's verbatim.
+
+**Also consider the adjacent section Kraken keeps right after it:
+"Terminology conventions" — a table of words never to use and what to say
+instead** (it never uses loan vocabulary: advance not loan, fees not interest,
+Client not borrower, because the legal characterization depends on it). If your
+tool has vocabulary that encodes a legal, compliance, or business reality —
+Harpoon's pre-offer language rules are the obvious case — give it the same
+treatment. Wrong words in generated output are a real defect there, not a style
+preference.
+
+Write your draft of all six, show it to Derek in Phase 2, and record the
+version he corrects — not the version you drafted.
 
 ## Phase 4 — Clean the repo
 

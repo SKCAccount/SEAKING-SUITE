@@ -11,6 +11,7 @@ belong to none of them.
 | [START.md](START.md) | The prompt for launching a fresh Claude Code session on suite work, from the `Claude Projects` root. |
 | [kraken-auth-handoff.md](kraken-auth-handoff.md) | Launch prompt for the Kraken-side session that closes signup and moves auth email to Resend — the two fixes the suite approved but does not execute. |
 | [tool-context-prompt.md](tool-context-prompt.md) | Launch prompt, run once per tool, that gives Plunder / Harpoon / Deepwatch / MANIFEST the `CLAUDE.md` each currently lacks — purpose, locked decisions, honest state, pitfalls, and a working agreement. |
+| [kraken-changelog-split.md](kraken-changelog-split.md) | Launch prompt for splitting Kraken's shipped-work changelog (72% of its 278 KB `CLAUDE.md`) into `CHANGELOG.md` — extraction first, move second. |
 
 ## Standing constraints (the short list every session must know)
 
