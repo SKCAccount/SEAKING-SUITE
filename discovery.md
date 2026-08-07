@@ -137,7 +137,25 @@ This is the deny-by-default violation §4 of the design doc treats as the cardin
 
 ## 6. MANIFEST — reference
 
-Fully documented in this repo ([README](../README.md)). Deployed to `seaking` 2026-08-03; forward-only; per-system ledger; fixture-sync guard; password auth. Pending: Vercel deploy, Google OAuth app, first thirty relationships. Suite-relevant: it defined the membership pattern (`app_owners`) and the ledger convention the other systems adopt.
+Fully documented in this repo ([README](../README.md)). Deployed to `seaking` 2026-08-03; forward-only; per-system ledger; fixture-sync guard; password auth. Pending: ~~Vercel~~ Netlify deploy (D15), Google OAuth app, first thirty relationships. Suite-relevant: it defined the membership pattern (`app_owners`) and the ledger convention the other systems adopt.
+
+### 6.1 The app is built; the sign-in was never exercised on `seaking` (found 2026-08-07)
+
+Derek: *"has manifest itself been built? I have never gotten past the login screen."* Investigated read-only; the app is **substantially built** — 22 routes (`/`, `/rolodex`, `/directory`, `/person/[id]` + new/edit, `/watchlist`, `/geography`, `/review`, `/sources`, `/sync`, `/offline`, plus capture / cron / Google-OAuth / auth API routes), 30 components, full `src/lib` (queries, actions, sync, capture, offline queue, phone, validation). Not a shell.
+
+`npm run doctor` against `seaking` returns **Ready**: schema deployed, 96 taxonomy values seeded, 8 views queryable, owner row present, auth user present, people table empty. Two deliberate warns (Google OAuth unconfigured until after the thirty; `ANTHROPIC_API_KEY` unset — quick-capture falls back to the manual form).
+
+**The correction.** ~~"Password sign-in works on localhost" (logged 2026-08-03)~~ — **not true of `seaking`.** Read via the admin API 2026-08-07, the sole auth user (`derek@seakingcapital.com`) shows:
+
+| Field | Value |
+|---|---|
+| `created_at` | 2026-06-20T23:42:20Z |
+| `email_confirmed_at` | 2026-06-20T23:42:46Z |
+| `last_sign_in_at` | **2026-06-20T23:42:46Z** — 26s after creation, i.e. the confirm itself |
+
+`last_sign_in_at` advances on password sign-in, so **no password sign-in has ever succeeded on `seaking`** — not on 2026-08-03, not since. The 2026-08-03 claim was almost certainly verified against the **local** stack: `.env.local` carries a commented-out `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321` block directly beneath the live `oznvdznekexdgblmxwqr` line, so both configurations existed and the local one was in use at some point. Lesson for the log: "works on localhost" and "works on the deployed project" are different claims about different databases, and only the second one matters here.
+
+**Consequence:** the login screen is rejecting a password that was never set on this project. Fix is one interactive command — `npm run auth:set-password` (service-key admin call, TTY-only by design so the password never reaches argv, env, or shell history). Magic link is the alternate way in (Supabase built-in email, fine at one user). Neither is a code change; nothing about the app needed building.
 
 ## 7. The seaking platform project — reference
 
@@ -283,5 +301,7 @@ The §10 answers:
   **Deepwatch** (README, BUILD_LOG, `engine/server.py`) → §5 updated: engine feature-complete (v5), **already has a local single-page web UI** on a stdlib server; no intake endpoint.
 
   Cross-cutting maps (§8.2, §8.3) updated: Plaid webhook row, Plunder's Resend, MANIFEST's crons → Netlify scheduled functions per D15.
+
+- **2026-08-07** — Derek asked whether MANIFEST itself was built ("I have never gotten past the login screen"). Investigated read-only → **new §6.1**. The app is built (22 routes, 30 components, full lib); `doctor` says Ready against `seaking`. The blocker is auth, and it produced a **correction to a 2026-08-03 claim**: `last_sign_in_at` on the sole auth user is 2026-06-20 (26 seconds after creation — the email confirm), so *password sign-in has never succeeded on `seaking`*; the earlier "works on localhost" note was about the local stack, whose config still sits commented-out in `.env.local`. Fix is `npm run auth:set-password`, which Derek must run himself (TTY-only by design). No code change, no schema change; nothing was written this session.
 
 **Still to examine (next discovery sessions):** `ucfy` live-state confirmation at K0 (cron rows, function list, secrets names — now a checklist §2.5 rather than an unknown) · Netlify env enumeration [needs Derek's session] · the two experiment repos' GitHub disposition (archive or not — optional cleanup) · **the cookie-jar test** (§8.5: do `@supabase/ssr` 0.5.2 and 0.7.0 interoperate on one cookie? — first experiment of S1) · Harpoon's `reviews/` + capability-letter docs when its mount design actually starts.
