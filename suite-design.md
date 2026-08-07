@@ -712,8 +712,18 @@ client completes a portal session; sign-in-once verified across the shell,
 `/manifest`, and `/kraken`; **a MANIFEST-only user is verified to get nothing
 from `/kraken`**; post-swap parity confirmed before the write-freeze lifts.
 
-**K6 — retirement.** After an agreed soak (suggest 2–4 weeks), final dump of
-`ucfy`, archive offline, delete the project.
+**K6 — retirement. Derek's action, on no schedule** (decided 2026-08-07).
+`ucfy` stays up and untouched — the standing rollback — until he is fully
+satisfied with the consolidated project. **No session proposes a deletion
+date, schedules one, or performs the deletion.** When he decides: final dump
+of `ucfy`, archive offline, then he deletes it himself. A session may help
+with the dump and the archive if asked; the deletion is his.
+
+*Why it stays up so long is cheap:* an idle free-tier project costs nothing,
+and some failure modes only surface on a calendar — nightly accrual, 30-day
+fee boundaries, the Monday digest, the monthly default reminder. Until each
+recurring job has fired at least once on `seaking`, only the daily paths have
+really been tested.
 
 Plunder is untouched by all of this — §7 happens on its own schedule and
 earlier. MANIFEST is untouched except that it is already mounted (§11).
@@ -837,7 +847,11 @@ and isn't worth a decision cycle.
    email from Derek.** One notice to the affected Client before cutover, one
    after; no portal banner. The portal's own sign-in is unchanged (it keeps
    its origin, D9) — the only Client-visible effect is a single re-login.
-4. Soak window before deleting `ucfy` (suggest 2–4 weeks).
+4. ~~Soak window before deleting `ucfy` (suggest 2–4 weeks)~~ **Decided
+   2026-08-07: no scheduled deletion.** `ucfy` stays up, untouched, until
+   Derek is fully satisfied with the consolidated project and deletes it
+   himself. No session proposes, schedules, or performs that deletion; K6
+   is his call and his action, on no clock.
 5. ~~The two queued `ucfy` fixes (close signup, Resend SMTP)~~ **Resolved
    2026-08-07: handed to the Kraken workstream**, launch prompt at
    [`kraken-auth-handoff.md`](kraken-auth-handoff.md). Not suite work. K4's
