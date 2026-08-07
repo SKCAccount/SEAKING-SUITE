@@ -59,8 +59,8 @@ Nine systems/artifacts found. Three were previously unknown to the suite convers
 
 ### 2.4 Flags (found, not fixed — nothing was changed on `ucfy`)
 
-1. **Open signup on production.** Stray signups get no `users` row → no data (deny-by-default holds), but a public financial system accepting signups is at minimum hygiene debt. **[ASK]** intentional (invite flow dependency?) or oversight — if oversight, fix on `ucfy` now, independent of any port. *(Resolved §10a: close it — deferred behind the freeze.)*
-2. **No custom SMTP** while a real client can request password resets. Pre-existing risk, not port-introduced. *(Resolved §10a: Resend — deferred behind the freeze.)*
+1. **Open signup on production.** Stray signups get no `users` row → no data (deny-by-default holds), but a public financial system accepting signups is at minimum hygiene debt. **[ASK]** intentional (invite flow dependency?) or oversight — if oversight, fix on `ucfy` now, independent of any port. *(Resolved §10a: close it — deferred behind the freeze.)* **✓ Executed on `ucfy` 2026-08-07 by the Kraken workstream** — `disable_signup=true`; self-signup refused (422 `signup_disabled`), invite round-trip verified unaffected. As-built card: Kraken `CLAUDE.md` → "Supabase dashboard configuration (NOT in code)".
+2. **No custom SMTP** while a real client can request password resets. Pre-existing risk, not port-introduced. *(Resolved §10a: Resend — deferred behind the freeze.)* **✓ Executed on `ucfy` 2026-08-07 by the Kraken workstream** — Resend SMTP live (`smtp.resend.com:465`, portal's send-only key, sender `Sea King Capital <no-reply@seakingcapital.com>`), auth email rate limit raised 2→30/hr (a separate setting SMTP alone does not lift — noted for K4). Same as-built card.
 3. Unpushed working-copy commits (2.1). *(Resolved §10a: pushed.)*
 4. `apps/jobs` is a stub — no runtime to port. *(Still true 2026-08-06: the edge functions live at `supabase/functions/`; `apps/jobs/README.md` is the subsystem doc.)*
 
@@ -245,6 +245,8 @@ The pivot to one origin makes several previously-irrelevant app details load-bea
 
 **⛔ Standing constraint, effective immediately: production Kraken is frozen.** No changes to the Netlify sites or to the `ucfy` Supabase project until Derek lifts this. Two already-approved fixes are therefore **deferred, not done**: closing signup on `ucfy` (#2) and custom SMTP on `ucfy` (#3 — Resend, `no-reply@seakingcapital.com`). Both execute at freeze-lift or as an early port step. (I was mid-flight on both when the freeze landed; nothing was touched.)
 
+> **Update 2026-08-07: both fixes are EXECUTED on `ucfy` — by the Kraken workstream, not this one.** Derek moved them to the Kraken session via `krakenauthhandoff.md` so the suite side stayed hands-off production. Signup closed (refusal + invite round-trip verified), Resend SMTP live (`no-reply@seakingcapital.com`, rate limit 2→30/hr), redirect probe 12/12 before and after. The as-built configuration — written as the K4 rebuild card — is Kraken `CLAUDE.md` → "Supabase dashboard configuration (NOT in code)"; the port note is Kraken `docs/BACKLOG.md` → "For the `seaking` port".
+
 > **Scope clarified 2026-08-06 (Derek).** The freeze is **suite-side**. It binds suite sessions — this workstream makes no changes to the Netlify sites or `ucfy`, and does not execute the two queued fixes — and it does **not** restrict Kraken's own product development, which continues on its normal cadence. The clarification was prompted by evidence that the literal wording and the practice had diverged: seven commits landed in the Kraken working copy on 2026-08-06 (`6a1fe51`…`c076837`), including `c4a547f` *"retrigger Netlify deploy after Pro upgrade"* — a production deploy — and migration `20260806120001_auto_parity_txn_ref_tiebreak.sql`. Kraken's own `CLAUDE.md` carries no mention of the freeze, and that repo's established norm runs migrations autonomously. So: two workstreams, one production system, one of them (this one) hands-off. The two approved `ucfy` fixes stay queued and are **not** suite work to execute unilaterally.
 
 **Decision, 2026-08-06 (Derek): build order.** In his words: build the consolidated suite **in parallel** while he continues to debug Kraken on the side; when the suite is fully set up **excluding Kraken**, an extended session brings Kraken in and cuts over; that is **the last task**, because Kraken stays in daily production use throughout the build and *"we cannot have that tool exist in two places — there needs to be a clean cutover."*
@@ -259,8 +261,8 @@ Consequences recorded with it:
 The §10 answers:
 
 1. **Plunder gate: yes** — and generalized: account setup becomes per-system yes/no toggles ("Kraken access? Plunder access? …"), admin-driven; unpermissioned tools don't even appear in the main dash. Toggles = membership rows; the "main dash" implies a **suite shell/launcher** (see #9).
-2. **Signup: never, anywhere.** Accounts exist only when an admin creates them. (Execution on `ucfy` deferred per the freeze; already true on `seaking`.)
-3. **SMTP: approved** — Resend, portal's key, `no-reply@seakingcapital.com`. Deferred per the freeze.
+2. **Signup: never, anywhere.** Accounts exist only when an admin creates them. (~~Execution on `ucfy` deferred per the freeze~~ — executed on `ucfy` 2026-08-07 by the Kraken workstream; already true on `seaking`.)
+3. **SMTP: approved** — Resend, portal's key, `no-reply@seakingcapital.com`. (~~Deferred per the freeze~~ — executed on `ucfy` 2026-08-07 by the Kraken workstream.)
 4. **Deepwatch: DONE** — pushed to `SKCAccount/DEEPWATCH` (remote's auto-init README merged, history preserved). Single-machine risk closed.
 5. **Kraken working copy: DONE** — both docs-only commits pushed (`25faf73..1c344d1`).
 6. **Experiments: graveyard**, both (`seaking-accountingevent-crm`, `sea-king-app`). Estate map updated; archiving the CRM repo on GitHub is optional cleanup.
