@@ -22,8 +22,11 @@ belong to none of them.
    `portal.seakingcapital.com`) or the `ucfy…` Supabase project. Derek's own
    Kraken product development continues unaffected — including the two approved
    auth fixes, **handed to that workstream 2026-08-07**
-   ([handoff](kraken-auth-handoff.md)). The freeze lifts at the final Kraken
-   port session (D13: Kraken comes last, one extended session, clean cutover).
+   ([handoff](kraken-auth-handoff.md)). The freeze was to lift at the final Kraken
+   port session (D13); **D17 (2026-09-27) removed the port** — Kraken stays in `ucfy` and
+   the small systems move in. The freeze now lifts step by step: each production-touching
+   step needs Derek's explicit go-ahead in-session (step 2 of suite-design §14.1 received it
+   on 2026-09-27).
 2. **Never `supabase db push` against the `seaking` project.** Each system
    applies its own migrations and records them in its own
    `{schema}.schema_migrations` ledger.

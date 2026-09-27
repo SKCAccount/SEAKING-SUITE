@@ -23,7 +23,7 @@ Open items are collected in §13.
 
 | # | Decision | State |
 |---|---|---|
-| D1 | One Supabase project (`seaking`, ref `oznvdznekexdgblmxwqr`) hosts every system | **[LIVE]** — `manifest` + `plunder` schemas are there today · *which project is under review: D17 proposes `ucfy`* |
+| D1 | One Supabase project (`seaking`, ref `oznvdznekexdgblmxwqr`) hosts every system | **[LIVE]** — `manifest` + `plunder` schemas are there today · *superseded in project by D17: the one project is `ucfy`* |
 | D2 | One schema per system; `public` stays empty of system objects | **[LIVE]** for MANIFEST and Plunder; Kraken moves at port |
 | D3 | One auth realm; email + password primary, magic link as recovery | **[LIVE]** |
 | D4 | **No self-signup anywhere, ever.** Accounts exist only when an admin creates them | **[DECIDED]** 2026-08-03 · **[LIVE]** on `seaking`; `ucfy` fix queued behind the freeze |
@@ -35,11 +35,11 @@ Open items are collected in §13.
 | D10 | Account setup = per-system yes/no toggles, admin-driven; unpermissioned tools don't appear | **[DECIDED]** 2026-08-03; mechanism in §5.3 |
 | D11 | MANIFEST is per-user: one instance per person, never a shared rolodex | **[DECIDED]** 2026-08-03 |
 | D12 | No `supabase db push` against the combined project — per-system migration ledgers | **[LIVE]** for MANIFEST; Kraken adopts at port |
-| D13 | **Kraken comes last.** The suite is fully set up excluding Kraken; then one extended session ports and cuts over — Kraken never exists in two places | **[DECIDED]** 2026-08-06 in shape; runbook detail **[PROPOSED]** §9 · *if D17 is confirmed, the port is replaced by moving the small systems into `ucfy` (§14.2)* |
+| D13 | **Kraken comes last.** The suite is fully set up excluding Kraken; then one extended session ports and cuts over — Kraken never exists in two places | **[DECIDED]** 2026-08-06 in shape; runbook detail **[PROPOSED]** §9 · *D17 replaces the port with moving the small systems into `ucfy` (§14.2); the rest of D13's intent — Kraken never exists in two places — holds trivially* |
 | D14 | **Universal grant-scoping stays**; "admin sees all" is maintained by auto-granting designated partners/admins on client creation | **[DECIDED]** 2026-08-07 — §5.5 option (a) as recommended |
 | D15 | Tools mount via **edge routing** on **Netlify**; shell serves `/` only, outside every tool's request path; S-track at an interim Netlify origin | **[DECIDED]** 2026-08-06 — §4.5 option (b) as recommended |
 | D16 | **One repository for the suite's TypeScript systems.** Kraken's repo (`SKCAccount/KRAKEN`, workspace `sea-king-command`) becomes the shared one; Deepwatch moves in first, then MANIFEST and Plunder if they fit; Harpoon and the website stay separate. **Each app still deploys on its own** — §4.5's rejection of one monolith stands | **[DECIDED]** 2026-09-27 in direction (Derek: *"I like the order you proposed"*); layout **[PROPOSED]** — §14 |
-| D17 | **The shared project is Kraken's `ucfy`, not `seaking`.** The small systems move into `ucfy`; Kraken never moves. Replaces D1's project and D13's port | **[PROPOSED]** 2026-09-27 — recommended in answer to Derek's question; awaiting his yes — §14.2 |
+| D17 | **The shared project is Kraken's `ucfy`, not `seaking`.** The small systems move into `ucfy`; Kraken never moves. Replaces D1's project and D13's port | **[DECIDED]** 2026-09-27 (Derek: *"Yes, make Kraken's project the shared one."*) — §14.2 |
 | D18 | **Development never runs on production data.** Kraken's local development moves to a local stack (later a hosted staging project) before any database consolidation and before accounting work | **[DECIDED]** 2026-09-27 (step 3 of the order) — §14 |
 
 ---
@@ -614,7 +614,7 @@ only the cookie contract has to be common.
 
 ---
 
-## 9. Kraken port runbook [runbook detail PROPOSED; timing DECIDED]
+## 9. Kraken port runbook [SUPERSEDED 2026-09-27 by D17 — Kraken does not move; kept for its inventory, which still guides backups and the small systems' moves]
 
 **The whole arc runs as one extended session at the end (D13).** Kraken stays
 in daily production use on `ucfy` until that session, and — Derek, 2026-08-06 —
@@ -871,14 +871,14 @@ and isn't worth a decision cycle.
 
 **Decisions waiting on Derek (2026-09-27):**
 
-- **D17** — make `ucfy` the shared project instead of porting Kraken into
-  `seaking` (§14.2). Recommended.
-- **The $750: fee or deposit?** Kraken books the diligence payment as revenue
-  earned on receipt and a refund as contra-revenue (Kraken migration
-  `20260905120002_diligence_fee_flow.sql`). Deepwatch's brief treats the same $750
-  as a deposit that funds the paid searches and is credited against the first
-  advance. Two accounting treatments of one payment; settle it once, likely with
-  the accountant, before either side builds further.
+- ~~**D17**~~ — **decided 2026-09-27: `ucfy` is the shared project** (§14.2).
+- ~~**The $750: fee or deposit?**~~ — **decided 2026-09-27 (Derek): Kraken's logic
+  stands.** Paid up front, the Good-Faith Deposit is earned when diligence commences
+  and is non-refundable, with any refund at SKC's discretion; Kraken books it as
+  Diligence Fee Revenue on receipt (4200; refunds 4210). Or SKC fronts it into the
+  first advance as Kraken's fronted fee, where it accrues discount and is earned when
+  that advance is made. Deepwatch follows (its ADR-026). Open, Kraken-side: where a
+  paid deposit's wire lives before the hand-off creates the Kraken client.
 
 **Timing-free:**
 
@@ -930,7 +930,7 @@ evidence and the reasoning are in discovery.md §11 (2026-09-27 entry).
 What stays true under all of it: separate deployables and separate secrets per app
 (§6.3), one schema and one role per system, deny-by-default (D5).
 
-### 14.2 Why `ucfy` should become the shared project [PROPOSED — D17]
+### 14.2 Why `ucfy` is the shared project [DECIDED 2026-09-27 — D17]
 
 §9's port is the riskiest work in this document: live client data; auth users with
 passwords and a real external Client forced to re-login; Vault secrets a dump cannot
@@ -945,7 +945,7 @@ templates customized, the redirect allowlist set. Deepwatch already targets `ucf
 historical — it existed for Plunder and MANIFEST when the suite was designed, while
 Kraken was busy in production — plus the tidy "`public` stays empty" rule (D2).
 
-What changes if confirmed:
+What changes:
 - **D1** — the one project is `ucfy`. **D2** — Kraken keeps `public` and `internal`;
   every other system gets its own schema; nothing else creates objects in `public`.
 - **D12** — unchanged in spirit: Kraken keeps its CLI history; every other system applies
