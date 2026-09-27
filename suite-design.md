@@ -1,6 +1,7 @@
 # Sea King Suite — identity, authorization, and consolidation
 
-**Revised 2026-08-06 for the one-origin model.** The revision-pending banner is
+**Amended 2026-09-27: one repository (D16), a proposed reversal of the project direction (D17),
+development off production data (D18) — §14.** **Revised 2026-08-06 for the one-origin model.** The revision-pending banner is
 closed: Derek's 2026-08-03 direction (discovery.md §10a) is folded in as
 decided, and the seven corrections discovery forced on the draft (discovery.md
 §9) are applied. What changed from the draft, and why, is listed in Appendix B.
@@ -22,7 +23,7 @@ Open items are collected in §13.
 
 | # | Decision | State |
 |---|---|---|
-| D1 | One Supabase project (`seaking`, ref `oznvdznekexdgblmxwqr`) hosts every system | **[LIVE]** — `manifest` + `plunder` schemas are there today |
+| D1 | One Supabase project (`seaking`, ref `oznvdznekexdgblmxwqr`) hosts every system | **[LIVE]** — `manifest` + `plunder` schemas are there today · *which project is under review: D17 proposes `ucfy`* |
 | D2 | One schema per system; `public` stays empty of system objects | **[LIVE]** for MANIFEST and Plunder; Kraken moves at port |
 | D3 | One auth realm; email + password primary, magic link as recovery | **[LIVE]** |
 | D4 | **No self-signup anywhere, ever.** Accounts exist only when an admin creates them | **[DECIDED]** 2026-08-03 · **[LIVE]** on `seaking`; `ucfy` fix queued behind the freeze |
@@ -34,9 +35,12 @@ Open items are collected in §13.
 | D10 | Account setup = per-system yes/no toggles, admin-driven; unpermissioned tools don't appear | **[DECIDED]** 2026-08-03; mechanism in §5.3 |
 | D11 | MANIFEST is per-user: one instance per person, never a shared rolodex | **[DECIDED]** 2026-08-03 |
 | D12 | No `supabase db push` against the combined project — per-system migration ledgers | **[LIVE]** for MANIFEST; Kraken adopts at port |
-| D13 | **Kraken comes last.** The suite is fully set up excluding Kraken; then one extended session ports and cuts over — Kraken never exists in two places | **[DECIDED]** 2026-08-06 in shape; runbook detail **[PROPOSED]** §9 |
+| D13 | **Kraken comes last.** The suite is fully set up excluding Kraken; then one extended session ports and cuts over — Kraken never exists in two places | **[DECIDED]** 2026-08-06 in shape; runbook detail **[PROPOSED]** §9 · *if D17 is confirmed, the port is replaced by moving the small systems into `ucfy` (§14.2)* |
 | D14 | **Universal grant-scoping stays**; "admin sees all" is maintained by auto-granting designated partners/admins on client creation | **[DECIDED]** 2026-08-07 — §5.5 option (a) as recommended |
 | D15 | Tools mount via **edge routing** on **Netlify**; shell serves `/` only, outside every tool's request path; S-track at an interim Netlify origin | **[DECIDED]** 2026-08-06 — §4.5 option (b) as recommended |
+| D16 | **One repository for the suite's TypeScript systems.** Kraken's repo (`SKCAccount/KRAKEN`, workspace `sea-king-command`) becomes the shared one; Deepwatch moves in first, then MANIFEST and Plunder if they fit; Harpoon and the website stay separate. **Each app still deploys on its own** — §4.5's rejection of one monolith stands | **[DECIDED]** 2026-09-27 in direction (Derek: *"I like the order you proposed"*); layout **[PROPOSED]** — §14 |
+| D17 | **The shared project is Kraken's `ucfy`, not `seaking`.** The small systems move into `ucfy`; Kraken never moves. Replaces D1's project and D13's port | **[PROPOSED]** 2026-09-27 — recommended in answer to Derek's question; awaiting his yes — §14.2 |
+| D18 | **Development never runs on production data.** Kraken's local development moves to a local stack (later a hosted staging project) before any database consolidation and before accounting work | **[DECIDED]** 2026-09-27 (step 3 of the order) — §14 |
 
 ---
 
@@ -147,6 +151,13 @@ with it. That posture is a design input, not an afterthought: whatever mounts
 Harpoon inherits a lead-PII store. Nothing in this document blocks on it.
 
 ### 1.6 Deepwatch [LIVE, local]
+
+**Updated 2026-09-27:** rebuilt in place since 2026-09-25 as the **onboarding and
+verification module** — a Next.js console and invite-only client portal at
+`/onboarding`, its own `onboarding` schema built for `ucfy` with its own migration
+ledger (DEEPWATCH ADR-002, ADR-005), and the event contract with Kraken
+(DEEPWATCH `docs/KRAKEN_CHANGES_REQUESTED.md`). Not deployed; no production
+apply yet. The document engine below lives on inside it as `docengine/`.
 
 Deterministic conditional document-assembly engine for deal documents (FOREACH,
 draft gating, bounded enumeration). Python, venv-bound, filesystem-backed.
@@ -858,6 +869,17 @@ and isn't worth a decision cycle.
    realm config should read whatever configuration that session records in
    Kraken's `CLAUDE.md` rather than re-deciding it.
 
+**Decisions waiting on Derek (2026-09-27):**
+
+- **D17** — make `ucfy` the shared project instead of porting Kraken into
+  `seaking` (§14.2). Recommended.
+- **The $750: fee or deposit?** Kraken books the diligence payment as revenue
+  earned on receipt and a refund as contra-revenue (Kraken migration
+  `20260905120002_diligence_fee_flow.sql`). Deepwatch's brief treats the same $750
+  as a deposit that funds the paid searches and is credited against the first
+  advance. Two accounting treatments of one payment; settle it once, likely with
+  the accountant, before either side builds further.
+
 **Timing-free:**
 
 6. ~~Does Austin review this document before build?~~ **Decided 2026-08-07: no
@@ -879,6 +901,69 @@ ever show up in latency · `apps/jobs` is a stub; if it becomes real it gets a
 named key and the same conventions · how a per-user system like MANIFEST mounts
 at a single path when there are two owners (defer with §10, but don't foreclose
 it).
+
+---
+
+## 14. Repository and project consolidation (2026-09-27)
+
+Derek asked whether separate repos for Kraken and Deepwatch create friction, with an
+accounting tool to be extracted from Kraken that Deepwatch would also post to. The
+evidence and the reasoning are in discovery.md §11 (2026-09-27 entry).
+
+### 14.1 The order [DECIDED 2026-09-27]
+
+1. **Now:** record the decisions (this section) and keep building Deepwatch as it is —
+   it already mirrors Kraken's stack, so the move stays mechanical.
+2. **The repository move (D16):** Deepwatch moves into Kraken's repository under
+   `deepwatch/`, history kept; Kraken's apps and packages keep their paths, so its two
+   Netlify sites keep building as they do. First, a build filter on each Kraken site so
+   Deepwatch commits never redeploy Kraken. A Kraken-side change: Derek's own Kraken
+   work, prepared and rehearsed as DEEPWATCH `docs/KRAKEN_CHANGES_REQUESTED.md` KCR-004.
+3. **A database for development (D18):** Kraken's development moves off live client data
+   onto a local stack, later a hosted staging project for previews. Before the database
+   consolidation and before any accounting work. Prepared as KCR-005.
+4. **The database consolidation** — D17's direction if confirmed (below), otherwise §9.
+5. **Accounting (Kraken's Arc A)** as its own app in the same repository, after Arc B,
+   with one owner of the books and one narrow door: other systems ask for a posting;
+   they never write the books.
+
+What stays true under all of it: separate deployables and separate secrets per app
+(§6.3), one schema and one role per system, deny-by-default (D5).
+
+### 14.2 Why `ucfy` should become the shared project [PROPOSED — D17]
+
+§9's port is the riskiest work in this document: live client data; auth users with
+passwords and a real external Client forced to re-login; Vault secrets a dump cannot
+carry (the Plaid tokens and the cron secret); eight pg_cron jobs; seven edge functions;
+the Plaid webhook; a scripted rewrite of 17+ migrations that hard-qualify `public.`; and
+a write-freeze with a delta sync. Moving the other way moves almost nothing: `seaking`
+holds Plunder's ~3.5k rows and 26-migration history, and MANIFEST with one user (Derek,
+who has never signed in there with a password — discovery.md §6.1). `ucfy` is also the
+more production-ready realm: signup closed and Resend SMTP live since 2026-08-07, email
+templates customized, the redirect allowlist set. Deepwatch already targets `ucfy`
+(DEEPWATCH ADR-005), so it never moves either. The recorded reasons for `seaking` were
+historical — it existed for Plunder and MANIFEST when the suite was designed, while
+Kraken was busy in production — plus the tidy "`public` stays empty" rule (D2).
+
+What changes if confirmed:
+- **D1** — the one project is `ucfy`. **D2** — Kraken keeps `public` and `internal`;
+  every other system gets its own schema; nothing else creates objects in `public`.
+- **D12** — unchanged in spirit: Kraken keeps its CLI history; every other system applies
+  its own migrations with its own ledger, as Deepwatch already does.
+- **D13 / §9** — the K-runbook's port is replaced by moving Plunder and MANIFEST into
+  `ucfy`. **§7's gate becomes a hard prerequisite for Plunder's move**: today any
+  signed-in realm user can read and write all Plunder data, and `ucfy` has real Clients.
+  Plunder's nightly worker must also connect as a role limited to its own schema, not
+  with a credential that would reach Kraken's data.
+- **D7 / §8** — the one-origin shell and the manager's move to `/kraken` are about
+  routing, not data; they stay as designed and can happen on their own schedule.
+
+Costs, stated: the combined project is the one Kraken's development touches today, so D18
+lands first; the blast radius of any leaked secret key now includes client money data,
+which makes §6.3's named key per app mandatory rather than advisable. Two checks before
+anything moves: that `ucfy` belongs to the "Sea King Capital LLC" Supabase organization
+(`seaking` does; a project can be transferred between organizations from the dashboard),
+and which plan it runs on.
 
 ---
 
