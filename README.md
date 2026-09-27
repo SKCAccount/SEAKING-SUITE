@@ -12,6 +12,8 @@ belong to none of them.
 | [kraken-auth-handoff.md](kraken-auth-handoff.md) | Launch prompt for the Kraken-side session that closes signup and moves auth email to Resend — the two fixes the suite approved but does not execute. |
 | [tool-context-prompt.md](tool-context-prompt.md) | Launch prompt, run once per tool, that gives Plunder / Harpoon / Deepwatch / MANIFEST the `CLAUDE.md` each currently lacks — purpose, locked decisions, honest state, pitfalls, and a working agreement. |
 | [kraken-changelog-split.md](kraken-changelog-split.md) | Launch prompt for splitting Kraken's shipped-work changelog (72% of its 278 KB `CLAUDE.md`) into `CHANGELOG.md` — extraction first, move second. |
+| [supplier-program.md](supplier-program.md) | The **Supplier Partner Program**. Its intake page (`seakingcapital.com/suppliers/`) was built 2026-09-26 in the website working tree and is not yet deployed. Holds the program model, Derek's 2026-09-26 decisions (random partner codes, no published commission rate, no portal link yet), the spam/cost-control recommendations, the Kraken supplier-profile spec (commissions and payout bank details), and the open [ASK]s. |
+| [broker-program.md](broker-program.md) | The broker / ISO referral program — **shelved 2026-09-14** (built, revised, then rolled back the same day; nothing reached GitHub or the live site). Kept as the record of the design: handoff model, commission model (up to 15% of profits, funded deals only), the agreement template ([broker-commission-agreement.docx](broker-commission-agreement.docx)), and the Kraken-portal weave-in spec, should it be revisited. |
 
 ## Standing constraints (the short list every session must know)
 
