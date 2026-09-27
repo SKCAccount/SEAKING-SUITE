@@ -51,8 +51,8 @@ Kraken (production PO-financing/AR-factoring, Netlify + own Supabase project,
 frozen) · Plunder (nightly event-scoring engine, GitHub Actions → `plunder`
 schema on `seaking`) · MANIFEST (Derek's personal rolodex, `manifest` schema on
 `seaking`, per-user by design) · Harpoon (govcon origination agent, local
-Docker, eventually web) · Deepwatch (deal-document assembly, local +
-`SKCAccount/DEEPWATCH`) · the `seaking` platform project · the GoDaddy marketing
+Docker, eventually web) · Deepwatch (onboarding & verification plus the document
+engine; in Kraken's repository under `deepwatch/` since 2026-09-27, D16) · the `seaking` platform project · the GoDaddy marketing
 site · two graveyarded experiments.
 
 Full detail, always: [discovery.md](discovery.md).
